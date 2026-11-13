@@ -1,0 +1,25 @@
+name: Deploy web
+on:
+  workflow_call:
+    inputs:
+      app:        { required: true, type: string }   # ex : web
+      remote_dir: { required: true, type: string }   # ex : fitfridge
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./apps/${{ inputs.app }} build
+      - name: Envoi vers OVH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OVH_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.OVH_HOST }}" >> ~/.ssh/known_hosts
+          rsync -az --delete apps/${{ inputs.app }}/dist/ \
+            "${{ secrets.OVH_USER }}@${{ secrets.OVH_HOST }}:${{ inputs.remote_dir }}/"
